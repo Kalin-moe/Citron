@@ -1,0 +1,101 @@
+name: Build Citron for Linux
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [Release]
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: 安装系统依赖
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          git \
+          libsdl2-dev \
+          qt6-base-dev \
+          qt6-multimedia-dev \
+          libavcodec-dev \
+          libavfilter-dev \
+          libavutil-dev \
+          libswscale-dev \
+          libvulkan-dev \
+          libboost-all-dev \
+          libssl-dev \
+          liblz4-dev \
+          libzstd-dev \
+          libfmt-dev \
+          nlohmann-json3-dev \
+          libopus-dev \
+          libusb-1.0-0-dev \
+          libx11-dev \
+          libgl1-mesa-dev \
+          libxcb-randr0-dev \
+          libxcb-xtest0-dev \
+          libxcb-xinerama0-dev \
+          libxcb-shape0-dev \
+          libxcb-xkb-dev \
+          libxcb-cursor-dev \
+          libxkbcommon-dev \
+          libxkbcommon-x11-dev \
+          libwayland-dev \
+          libxi-dev
+    
+    - name: 配置 CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+          -DENABLE_QT=ON \
+          -DENABLE_SDL2=ON \
+          -DENABLE_OPENGL=ON \
+          -DENABLE_LIBUSB=ON \
+          -DENABLE_CUBEB=ON \
+          -DCITRON_TESTS=OFF \
+          -GNinja
+    
+    - name: 编译项目
+      run: |
+        cd build
+        ninja -j$(nproc)
+    
+    - name: 测试可执行文件
+      run: |
+        cd build
+        if [ -f bin/citron ]; then
+          echo "✅ Qt 版本编译成功"
+          file bin/citron
+        fi
+        if [ -f bin/citron-cmd ]; then
+          echo "✅ 命令行版本编译成功"
+          file bin/citron-cmd
+        fi
+    
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: citron-linux-${{ matrix.build-type }}
+        path: |
+          build/bin/citron
+          build/bin/citron-cmd
+        if-no-files-found: error
+        retention-days: 7
